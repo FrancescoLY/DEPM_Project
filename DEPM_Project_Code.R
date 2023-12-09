@@ -1,5 +1,9 @@
 library(TCGAbiolinks)
 library(SummarizedExperiment)
+library(psych)
+library(DescTools)
+library(network)
+library(igraph)
 
 proj <- "TCGA-HNSC"
 dir.create(file.path(proj))
@@ -120,3 +124,88 @@ length(deg.genes)   # 650
 # 
 # deg.genes <- rownames(expr.table[abs(expr.table$fc) >= 1.2 & expr.table$pval.fc.fdr <=0.05,])
 # length(deg.genes)   # 1238
+
+
+# 3. Co-expression networks -----------------------------------------------
+
+# Using Pearson correlation coefficient, Bonferroni correction, 0.7 threshold
+
+filtr.expr.c.deg <- filtr.expr.c[deg.genes,]
+# dim(filtr.expr.c.deg) # (650x43)
+cor.mat.c <- corr.test(t(filtr.expr.c.deg), use = "pairwise", 
+                       method = "pearson",adjust="bonferroni",ci=FALSE)
+rho.c <- cor.mat.c$r
+# dim(rho.c)            # (650x650) 
+diag(rho.c) <- 0
+
+filtr.expr.n.deg <- filtr.expr.n[deg.genes,]
+# dim(filtr.expr.n.deg) # (650x43)
+cor.mat.n <- corr.test(t(filtr.expr.n.deg), use = "pairwise", 
+                       method = "pearson",adjust="bonferroni",ci=FALSE)
+rho.n <- cor.mat.n$r
+# dim(rho.n)            # (650x650) 
+diag(rho.n) <- 0
+
+
+# 4. Differential Co-expressed Network  -----------------------------------
+
+fisher.z.c <- FisherZ(rho.c)
+# dim(fisher.z.c)
+
+fisher.z.n <- FisherZ(rho.n)
+# dim(fisher.z.n)
+
+# Assuming both fractions in the formula denominator are under the same 
+# square root
+sample_size = 43
+Z.scores <- (fisher.z.c-fisher.z.n)/sqrt(1/(sample_size-3)+1/(sample_size-3))
+# dim(Z.scores)
+# isSymmetric(Z.scores) 
+diag(Z.scores) <- 0
+filtr.Z.scores <- Z.scores * (abs(Z.scores) >= 3)
+# # Check that all elements with |Z| < 3 are removed
+# j = 0
+# for (i in filtr.Z.scores) {
+#   # j <- j+1
+#   if (i != 0 && abs(i) < 3) {
+#     j <- j+1
+#   }
+# }
+# j  # == 0
+adj.mat.diff <- matrix(0, ncol = 650, nrow = 650)
+adj.mat.diff[filtr.Z.scores != 0] <- 1
+# sum(diag(adj.mat.diff))                                             # == 0
+# length(which(adj.mat.diff!=0)) - length(which(filtr.Z.scores!=0))   # == 0
+# # Check all nonzero elements are 1
+# j = 0
+# k = 0
+# for (i in adj.mat.diff) {
+#   # j <- j+1
+#   if (i != 0) {
+#     j <- j+1
+#     k <- k+i
+#   }
+# }
+# j-k  # == 0
+net.diff <- network(adj.mat.diff, matrix.type="adjacency", directed = F)
+digree.diff <- rowSums(adj.mat.diff != 0)
+hist(digree.diff)
+hist(digree.diff, breaks = 20)
+hist(digree.diff, breaks = 40)
+hist(digree.diff, breaks = 80)
+hist(digree.diff, breaks = 160)
+hist(digree.diff, breaks = network.size(net.diff))
+# plot(table(degree.diff))
+# degree.diff.freq <- as.data.frame(table(degree.diff))
+# # colnames(degree.diff.freq)
+plot(as.numeric(degree.diff.freq$degree.diff),
+     as.numeric(degree.diff.freq$Freq), log = "xy", type='p')
+
+# # Fitting a power law over the histogram
+# power.law.params <- power.law.fit(digree.diff)
+# hist(digree.diff, prob=TRUE, breaks = 80)
+# fun <- function(x) {
+#   x**(-1*power.law.params$alpha)
+# }
+# x2 <- seq(min(digree.diff), max(digree.diff), length = 80)
+# curve(fun, from = 157, to = 250, add= TRUE, lwd = 2)     
