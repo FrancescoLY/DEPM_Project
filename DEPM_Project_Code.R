@@ -162,33 +162,35 @@ Z.scores <- (fisher.z.c-fisher.z.n)/sqrt(1/(sample_size-3)+1/(sample_size-3))
 # dim(Z.scores)
 # isSymmetric(Z.scores) 
 diag(Z.scores) <- 0
-filtr.Z.scores <- Z.scores * (abs(Z.scores) >= 3)
-# # Check that all elements with |Z| < 3 are removed
-# j = 0
-# for (i in filtr.Z.scores) {
-#   # j <- j+1
-#   if (i != 0 && abs(i) < 3) {
-#     j <- j+1
-#   }
-# }
-# j  # == 0
-adj.mat.diff <- matrix(0, ncol = 650, nrow = 650)
-adj.mat.diff[filtr.Z.scores != 0] <- 1
+adj.mat.diff <- Z.scores * (abs(Z.scores) >= 3)
+# Check that all elements with |Z| < 3 are removed
+j = 0
+for (i in adj.mat.diff) {
+  # j <- j+1
+  if (i != 0 && abs(i) < 3) {
+    j <- j+1
+  }
+}
+j  # == 0
+# adj.mat.diff <- matrix(0, ncol = 650, nrow = 650)
+adj.mat.diff[adj.mat.diff != 0] <- 1
 # sum(diag(adj.mat.diff))                                             # == 0
 # length(which(adj.mat.diff!=0)) - length(which(filtr.Z.scores!=0))   # == 0
-# # Check all nonzero elements are 1
-# j = 0
-# k = 0
-# for (i in adj.mat.diff) {
-#   # j <- j+1
-#   if (i != 0) {
-#     j <- j+1
-#     k <- k+i
-#   }
-# }
-# j-k  # == 0
+# Check all nonzero elements are 1
+j = 0
+k = 0
+for (i in adj.mat.diff) {
+  # j <- j+1
+  if (i != 0) {
+    j <- j+1
+    k <- k+i
+  }
+}
+j-k  # == 0
 net.diff <- network(adj.mat.diff, matrix.type="adjacency", directed = F)
+# network.density(net.diff)
 digree.diff <- rowSums(adj.mat.diff != 0)
+names(degree.diff) <- rownames(adj.mat.diff)
 hist(digree.diff)
 hist(digree.diff, breaks = 20)
 hist(digree.diff, breaks = 40)
@@ -196,7 +198,7 @@ hist(digree.diff, breaks = 80)
 hist(digree.diff, breaks = 160)
 hist(digree.diff, breaks = network.size(net.diff))
 # plot(table(degree.diff))
-# degree.diff.freq <- as.data.frame(table(degree.diff))
+degree.diff.freq <- as.data.frame(table(degree.diff))
 # # colnames(degree.diff.freq)
 plot(as.numeric(degree.diff.freq$degree.diff),
      as.numeric(degree.diff.freq$Freq), log = "xy", type='p')
@@ -209,3 +211,13 @@ plot(as.numeric(degree.diff.freq$degree.diff),
 # }
 # x2 <- seq(min(digree.diff), max(digree.diff), length = 80)
 # curve(fun, from = 157, to = 250, add= TRUE, lwd = 2)     
+
+# Assuming the network is a scale free network
+# sum(degree.diff == 0)
+# q <- quantile(digree.diff[digree.diff>0],0.95)
+q <- quantile(digree.diff,0.95)
+# q
+# hist(degree.diff)
+# abline(v=q, col="red")
+hubs.diff <- degree.diff[degree.diff>=q]
+names(hubs.diff)
