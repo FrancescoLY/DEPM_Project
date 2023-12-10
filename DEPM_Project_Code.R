@@ -4,6 +4,7 @@ library(psych)
 library(DescTools)
 library(network)
 library(igraph)
+library(GGally)
 
 proj <- "TCGA-HNSC"
 dir.create(file.path(proj))
@@ -219,5 +220,43 @@ q <- quantile(digree.diff,0.95)
 # q
 # hist(degree.diff)
 # abline(v=q, col="red")
+
 hubs.diff <- degree.diff[degree.diff>=q]
 names(hubs.diff)
+
+# hubs.diff <- sort(hubs.diff, decreasing = F)
+# hubs.diff <- hubs.diff[1]
+
+hubs.diff.ids <- vector("integer",length(hubs.diff))
+for (i in 1:length(hubs.diff)){hubs.diff.ids[i] <- match(names(hubs.diff)[i],
+                                                      rownames(adj.mat.diff))}
+hubs.diff.ids
+#identifying the neighborhood of the hubs
+hubs.diff.neigh.ids <- c()
+for (hub in hubs.diff.ids){
+  hubs.diff.neigh.ids <- append(hubs.diff.neigh.ids, 
+                                get.neighborhood(net.diff, hub))
+}
+hubs.diff.neigh.ids <- unique(hubs.diff.neigh.ids)
+hubs.diff.neigh.ids
+hubs.diff.neigh.names <- rownames(adj.mat.diff[hubs.diff.neigh.ids,])
+subnet.diff <- unique(c(names(hubs.diff), hubs.diff.neigh.names))
+hubs.diff.adj <- adj.mat.diff[subnet.diff, subnet.diff]
+names.hubs.diff <-names(hubs.diff)
+
+net.hubs.diff <- network(hubs.diff.adj, matrix.type="adjacency")
+net.hubs.diff %v% "type" = ifelse(network.vertex.names(net.hubs.diff) %in% 
+                                    names.hubs.diff,"hub", "non-hub")
+net.hubs.diff %v% "color" = ifelse(net.hubs.diff %v% "type" == "hub", 
+                                   "tomato", "deepskyblue3")
+net.hubs.diff %v% "color" <- sort(net.hubs.diff %v% "color")
+
+# ggnet2(net.hubs.diff,  color = "color", size = "degree", # max_size=250,
+#        edge.alpha = 0.7,  edge.size = 0.1,
+#        # node.label = names.hubs.diff, label.color = "black", # label.size = 4
+#        ) + guides(size = "none")
+
+ggnet2(net.hubs.diff, color = "color", alpha = 0.7, size = 2,
+       # edge.color = "edgecolor", 
+       edge.alpha = 1, edge.size = 0.15)+
+  guides(size = "none") 
