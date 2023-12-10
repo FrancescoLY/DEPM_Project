@@ -204,6 +204,15 @@ head(degree.c,10)
 sum(degree.c == 0) #unconnected nodes 
 
 hist(degree.c)
+
+#We want to verify if the network is a scale-free network
+sampledata1 <- data.frame(x = degree.c, y = 1:654)
+plot_data1 <- data.frame(x= log(sampledata$x), y= log(sampledata$y))
+
+ggplot(plot_data1, aes(x=x,y=y)) + 
+  geom_point()+ labs(title = 'log-log plot', x = 'degree', y = 'frequency')
+
+#Find hubs
 x <- quantile(degree.c[degree.c>0],0.95) #how big is the degree of the most connected nodes?
 x
 hist(degree.c)
@@ -242,12 +251,15 @@ head(degree.n,10)
 sum(degree.n == 0) #unconnected nodes 
 
 hist(degree.n)
+
+#We want to verify if the network is scale-free
 sampledata <- data.frame(x = degree.n, y = 1:654)
 plot_data <- data.frame(x= log(sampledata$x), y= log(sampledata$y))
 
 ggplot(plot_data, aes(x=x,y=y)) + 
   geom_point()+ labs(title = 'log-log plot', x = 'degree', y = 'frequency')
 
+#Find hubs
 y <- quantile(degree.n[degree.n>0],0.95) #how big is the degree of the most connected nodes?
 y
 hist(degree.n)
@@ -266,3 +278,48 @@ ggnet2(net.n, color = "color", alpha = 0.7, size = 2,
 
 
 intersect(names(hubs.c),names(hubs.n))
+
+
+#hub subnetwork
+hubs <- hubs.c[1] 
+hubs.c.ids <- vector("integer",length(hubs))
+for (i in 1:length(hubs)){hubs.c.ids[i] <- match(names(hubs)[i],rownames(adj.mat.c))}
+hubs.c.ids
+
+
+#identifying the neighborhood
+hubs.c.neigh <- c()
+for (i in hubs.c.ids){
+  hubs.c.neigh <- append(hubs.c.neigh, get.neighborhood(net.c, i))
+}
+
+hubs.c.neigh <- unique(hubs.c.neigh)
+neigh <- hubs.c.neigh[1:10]
+neigh.names <- rownames(adj.mat.c[neigh,])
+subnet <- unique(c(names(hubs),neigh.names))
+
+#creating the subnetwork
+hub.c.adj <- adj.mat.c[subnet, subnet]
+
+names.hubs <-names(hubs)
+
+rownames(hub.c.adj)[1:length(hubs)] <- names.hubs
+colnames(hub.c.adj)[1:length(hubs)] <- names.hubs
+head(rownames(hub.c.adj))
+head(colnames(hub.c.adj))
+
+net.hub <- network(hub.c.adj, matrix.type="adjacency",ignore.eval = FALSE, names.eval = "weights")
+network.density(net.hub)
+
+sum(hub.c.adj > 0 )
+sum(hub.c.adj < 0)
+
+
+net.hub %v% "type" = ifelse(network.vertex.names(net.hub) %in% names.hubs,"hub", "non-hub")
+net.hub %v% "color" = ifelse(net.hub %v% "type" == "non-hub", "deepskyblue3", "tomato")
+set.edge.attribute(net.hub, "ecolor", ifelse(net.hub %e% "weights" > 0, "red", "blue"))
+
+ggnet2(net.hub,  color = "color",alpha = 0.9, size = 2, 
+       edge.color = "ecolor", edge.alpha = 0.9,  edge.size = 0.15, 
+       node.label = neigh.names, label.color = "black", label.size = 4)+
+  guides(size = "none")
